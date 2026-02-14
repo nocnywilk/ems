@@ -1,7 +1,7 @@
 import asyncio
 import structlog
 from datetime import datetime, timezone
-from typing import Literal, TypedDict
+from typing import Literal, Optional, TypedDict
 
 log = structlog.get_logger()
 
@@ -92,7 +92,7 @@ class DecisionLoop:
             reason=result["reason"],
         )
 
-    async def _fetch_current_price_ct(self) -> float | None:
+    async def _fetch_current_price_ct(self) -> Optional[float]:
         query = f'''
 from(bucket: "{self._bucket}")
   |> range(start: -6h)
