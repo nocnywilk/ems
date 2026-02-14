@@ -25,11 +25,49 @@ structlog.configure(
 log = structlog.get_logger()
 HEARTBEAT_PATH = Path("/var/log/ems/heartbeat")
 
+
 async def heartbeat():
     HEARTBEAT_PATH.parent.mkdir(parents=True, exist_ok=True)
     while True:
         HEARTBEAT_PATH.touch()
         await asyncio.sleep(30)
+
+
+async def status_server():
+    async def _handle(reader, writer):
+        body = b'{"status":"ok"}'
+        try:
+            request_line = await reader.readline()
+            parts = request_line.decode("utf-8", errors="ignore").strip().split(" ")
+            path = parts[1] if len(parts) >= 2 else "/"
+            while True:
+                line = await reader.readline()
+                if not line or line in (b"\r\n", b"\n"):
+                    break
+            if path == "/status":
+                response = (
+                    b"HTTP/1.1 200 OK\r\n"
+                    b"Content-Type: application/json\r\n"
+                    b"Content-Length: " + str(len(body)).encode("ascii") + b"\r\n"
+                    b"Connection: close\r\n\r\n" + body
+                )
+            else:
+                response = (
+                    b"HTTP/1.1 404 Not Found\r\n"
+                    b"Content-Length: 0\r\n"
+                    b"Connection: close\r\n\r\n"
+                )
+            writer.write(response)
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(_handle, host="0.0.0.0", port=8080)
+    log.info("ems.status_server_started", port=8080)
+    async with server:
+        await server.serve_forever()
+
 
 async def main():
     log.info("ems.starting", version="0.1.0")
@@ -62,6 +100,7 @@ async def main():
     try:
         await asyncio.gather(
             heartbeat(),
+            status_server(),
             # Control loops
             decision.run_forever(),
             actuation.run_forever(),

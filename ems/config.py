@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -38,4 +40,25 @@ class Settings(BaseSettings):
     ems: EMSConfig = Field(default_factory=EMSConfig)
 
 def load_settings() -> Settings:
+    env_aliases = {
+        "INFLUXDB_URL": "INFLUX_URL",
+        "INFLUXDB_TOKEN": "INFLUX_TOKEN",
+        "INFLUXDB_ORG": "INFLUX_ORG",
+        "INFLUXDB_BUCKET": "INFLUX_BUCKET",
+        "SONNEN_USER": "SONNEN_IP",
+        "SONNEN_PASS": "SONNEN_TOKEN",
+    }
+    for src, dst in env_aliases.items():
+        if src in os.environ and dst not in os.environ:
+            os.environ[dst] = os.environ[src]
+
+    defaults = {
+        "SOLCAST_SITE_1": "dummy_site_1",
+        "SOLCAST_SITE_2": "dummy_site_2",
+        "SONNEN_IP": "127.0.0.1",
+        "SONNEN_TOKEN": "dummy_sonnen_token",
+    }
+    for key, value in defaults.items():
+        os.environ.setdefault(key, value)
+
     return Settings()
