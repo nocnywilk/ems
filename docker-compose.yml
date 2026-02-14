@@ -1,0 +1,63 @@
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: ems-influxdb
+    restart: unless-stopped
+    ports:
+      - "${INFLUX_PORT:-8086}:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE:          setup
+      DOCKER_INFLUXDB_INIT_USERNAME:      ${INFLUX_USER}
+      DOCKER_INFLUXDB_INIT_PASSWORD:      ${INFLUX_PASS}
+      DOCKER_INFLUXDB_INIT_ORG:           ${INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET:        ${INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:   ${INFLUX_TOKEN}
+      DOCKER_INFLUXDB_INIT_RETENTION:     90d
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+      - ./influxdb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: ems-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS:-admin}
+      GF_INSTALL_PLUGINS:         ""
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+  ems:
+    build:
+      context: ./ems
+      dockerfile: Dockerfile
+    container_name: ems-core
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      INFLUX_URL: http://influxdb:8086
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./ems:/app:ro
+      - ems-logs:/var/log/ems
+
+volumes:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:
+  ems-logs:

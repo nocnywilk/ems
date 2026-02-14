@@ -1,0 +1,6 @@
+influxdb-client[async]==1.44.0
+httpx==0.27.2
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+structlog==24.4.0
